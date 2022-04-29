@@ -56,6 +56,31 @@ app.get(PARTICIPANTS_PATH, async (req, res) => {
   }
 });
 
+app.get(MESSAGES_PATH, async (req, res) => {
+  const user = req.header("user");
+  if (user === undefined) {
+    console.log(chalk.red(`${ERROR} No user header`));
+    res.status(400).send({ error: "No user header" });
+    return;
+  }
+  try {
+    const messages = await database.collection("messages").find().toArray();
+    const limit = parseInt(req.query.limit) || messages.length;
+    const output = messages
+      .reverse()
+      .slice(0, limit)
+      .filter((message) => {
+        return (
+          message.to === user || message.to === "Todos" || message.from === user
+        );
+      });
+    res.send(output);
+  } catch (err) {
+    console.log(chalk.red(`${ERROR} ${err}`));
+    res.status(500).send(err);
+  }
+});
+
 app.post(PARTICIPANTS_PATH, async (req, res) => {
   const participant = req.body;
 
@@ -96,7 +121,9 @@ app.post(PARTICIPANTS_PATH, async (req, res) => {
         type: "status",
         time: new Date().toLocaleTimeString(),
       });
-      console.log(chalk.green(`${DB_INFO} ${participant.name} inserted`));
+      console.log(
+        chalk.green(`${DB_INFO} user ${chalk.bold(participant.name)} created`)
+      );
       res.sendStatus(201);
     } catch (err) {
       console.log(chalk.red(`${ERROR} ${err}`));
@@ -104,31 +131,6 @@ app.post(PARTICIPANTS_PATH, async (req, res) => {
     }
   } catch (err) {
     console.log(chalk.bold.red(err));
-    res.status(500).send(err);
-  }
-});
-
-app.get(MESSAGES_PATH, async (req, res) => {
-  const user = req.header("user");
-  if (user === undefined) {
-    console.log(chalk.red(`${ERROR} No user header`));
-    res.status(400).send({ error: "No user header" });
-    return;
-  }
-  try {
-    const messages = await database.collection("messages").find().toArray();
-    const limit = parseInt(req.query.limit) || messages.length;
-    const output = messages
-      .reverse()
-      .slice(0, limit)
-      .filter((message) => {
-        return (
-          message.to === user || message.to === "Todos" || message.from === user
-        );
-      });
-    res.send(output);
-  } catch (err) {
-    console.log(chalk.red(`${ERROR} ${err}`));
     res.status(500).send(err);
   }
 });
@@ -216,7 +218,7 @@ app.post(STATUS_PATH, async (req, res) => {
           `${ERROR} Participant ${chalk.underline(user)} does not exist`
         )
       );
-      res.sendStatus(422);
+      res.sendStatus(404);
       return;
     }
 
@@ -224,8 +226,10 @@ app.post(STATUS_PATH, async (req, res) => {
       await database
         .collection("participants")
         .updateOne({ name: user }, { $set: { lastStatus: Date.now() } });
-      console.log(chalk.green(`${DB_INFO} ${user} status updated`));
-      res.sendStatus(201);
+      console.log(
+        chalk.green(`${DB_INFO} user ${chalk.bold(user)} status updated`)
+      );
+      res.sendStatus(200);
     } catch (err) {
       console.log(chalk.red(`${ERROR} ${err}`));
       res.status(500).send(err);
