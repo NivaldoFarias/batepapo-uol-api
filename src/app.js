@@ -1,5 +1,5 @@
 import express, { json } from "express";
-import { MongoClient, ServerApiVersion } from "mongodb";
+import { MongoClient, ServerApiVersion, ObjectId } from "mongodb";
 import { stripHtml } from "string-strip-html";
 import cors from "cors";
 import chalk from "chalk";
@@ -17,6 +17,8 @@ const ERROR = chalk.bold.red("[ERROR]");
 const regex = /^(message|private_message)$/;
 const PARTICIPANTS_PATH = "/participants";
 const MESSAGES_PATH = "/messages";
+const DEL_MESSAGES_PATH = "/messages/:messageId";
+const PUT_MESSAGES_PATH = "/messages/:messageId";
 const STATUS_PATH = "/status";
 const PORT = process.env.PORT || 5000;
 const participantSchema = Joi.object({
@@ -241,12 +243,12 @@ app.post(STATUS_PATH, async (req, res) => {
   }
 });
 
-app.delete("/messages/:messageId", async (req, res) => {
+app.delete(DEL_MESSAGES_PATH, async (req, res) => {
   const messageId = req.params.messageId;
   try {
     const message = await database
       .collection("messages")
-      .findOne({ _id: new ObjectID(messageId) });
+      .findOne({ _id: new ObjectId(messageId) });
     if (!message) {
       console.log(
         chalk.red(`${ERROR} Message ${chalk.bold(messageId)} does not exist`)
@@ -277,9 +279,78 @@ app.delete("/messages/:messageId", async (req, res) => {
     try {
       await database
         .collection("messages")
-        .deleteOne({ _id: new ObjectID(messageId) });
+        .deleteOne({ _id: new ObjectId(messageId) });
       console.log(
-        chalk.blue(`${DB_INFO} message ${chalk.bold(messageId)} deleted`)
+        chalk.blue(
+          `${DB_INFO} message ${chalk.bold(messageId)} from user ${chalk.bold(
+            user
+          )} deleted`
+        )
+      );
+      res.sendStatus(200);
+    } catch (err) {
+      console.log(chalk.red(`${ERROR} ${err}`));
+      res.status(500).send(err);
+    }
+  } catch (err) {
+    console.log(chalk.red(`${ERROR} ${err}`));
+    res.status(500).send(err);
+  }
+});
+
+app.put(PUT_MESSAGES_PATH, async (req, res) => {
+  const messageId = req.params.messageId;
+  const message = req.body;
+  try {
+    const validate = messageSchema.validate(message, {
+      abortEarly: true,
+    });
+    if (validate.error) {
+      console.log(chalk.red(`${ERROR} ${validate.error.details[0].message}`));
+      res.status(422).send(validate.error.details[0]);
+      return;
+    }
+
+    const messageToUpdate = await database
+      .collection("messages")
+      .findOne({ _id: new ObjectId(messageId) });
+    if (!messageToUpdate) {
+      console.log(
+        chalk.red(`${ERROR} Message ${chalk.bold(messageId)} does not exist`)
+      );
+      res.sendStatus(404);
+      return;
+    }
+
+    const user = req.header("user");
+    if (user === undefined) {
+      console.log(chalk.red(`${ERROR} No user header`));
+      res.status(400).send({ error: "No user header" });
+      return;
+    }
+
+    if (messageToUpdate.from !== user && messageToUpdate.to !== user) {
+      console.log(
+        chalk.red(
+          `${ERROR} Message ${chalk.bold(
+            messageId
+          )} does not belong to user ${chalk.bold(user)}`
+        )
+      );
+      res.sendStatus(401);
+      return;
+    }
+
+    try {
+      await database
+        .collection("messages")
+        .updateOne({ _id: new ObjectId(messageId) }, { $set: message });
+      console.log(
+        chalk.blue(
+          `${DB_INFO} message ${chalk.bold(messageId)} from user ${chalk.bold(
+            user
+          )} updated`
+        )
       );
       res.sendStatus(200);
     } catch (err) {
