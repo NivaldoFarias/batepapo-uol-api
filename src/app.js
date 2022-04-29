@@ -78,7 +78,7 @@ app.get(MESSAGES_PATH, async (req, res) => {
           message.to === user || message.to === "Todos" || message.from === user
         );
       });
-    res.send(output);
+    res.send(output.reverse());
   } catch (err) {
     console.log(chalk.red(`${ERROR} ${err}`));
     res.status(500).send(err);
@@ -86,15 +86,17 @@ app.get(MESSAGES_PATH, async (req, res) => {
 });
 
 app.post(PARTICIPANTS_PATH, async (req, res) => {
-  const {
-    participant: { name },
-  } = req.body;
-  name = stripHtml(name).trim();
+  const { name } = req.body;
+  stripHtml(name);
+  name.trim();
 
   try {
-    const validate = participantSchema.validate(participant, {
-      abortEarly: true,
-    });
+    const validate = participantSchema.validate(
+      { name: name },
+      {
+        abortEarly: true,
+      }
+    );
     if (validate.error) {
       console.log(chalk.red(`${ERROR} ${validate.error.details[0].message}`));
       res.status(422).send(validate.error.details[0]);
@@ -152,17 +154,19 @@ app.post(MESSAGES_PATH, async (req, res) => {
       return;
     }
 
-    const destinatary = await database
-      .collection("participants")
-      .findOne({ name: message.to });
-    if (!destinatary) {
-      console.log(
-        chalk.red(
-          `${ERROR} Participant ${chalk.bold(message.to)} does not exist`
-        )
-      );
-      res.status(404).send({ error: "Este participante não existe" });
-      return;
+    if (message.type === "private_message") {
+      const destinatary = await database
+        .collection("participants")
+        .findOne({ name: message.to });
+      if (!destinatary) {
+        console.log(
+          chalk.red(
+            `${ERROR} Participant ${chalk.bold(message.to)} does not exist`
+          )
+        );
+        res.status(404).send({ error: "Este participante não existe" });
+        return;
+      }
     }
 
     const user = req.header("user");
