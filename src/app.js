@@ -1,9 +1,9 @@
 import express, { json } from "express";
 import { MongoClient, ServerApiVersion } from "mongodb";
+import { stripHtml } from "string-strip-html";
 import cors from "cors";
 import chalk from "chalk";
 import Joi from "joi";
-
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -84,7 +84,10 @@ app.get(MESSAGES_PATH, async (req, res) => {
 });
 
 app.post(PARTICIPANTS_PATH, async (req, res) => {
-  const participant = req.body;
+  const {
+    participant: { name },
+  } = req.body;
+  name = stripHtml(name).trim();
 
   try {
     const validate = participantSchema.validate(participant, {
@@ -98,12 +101,10 @@ app.post(PARTICIPANTS_PATH, async (req, res) => {
 
     const participantExists = await database
       .collection("participants")
-      .findOne({ name: participant.name });
+      .findOne({ name: name });
     if (participantExists) {
       console.log(
-        chalk.red(
-          `${ERROR} Participant ${chalk.bold(participant.name)} already exists`
-        )
+        chalk.red(`${ERROR} Participant ${chalk.bold(name)} already exists`)
       );
       res.status(409).send("Este participante já existe");
       return;
@@ -111,11 +112,11 @@ app.post(PARTICIPANTS_PATH, async (req, res) => {
 
     try {
       await database.collection("participants").insertOne({
-        name: participant.name,
+        name: name,
         lastStatus: Date.now(),
       });
       await database.collection("messages").insertOne({
-        from: participant.name,
+        from: name,
         to: "Todos",
         text: "entra na sala...",
         type: "status",
@@ -123,9 +124,7 @@ app.post(PARTICIPANTS_PATH, async (req, res) => {
       });
       console.log(
         chalk.blue(
-          `${DB_INFO} user ${chalk.bold(
-            participant.name
-          )} created and message sent`
+          `${DB_INFO} user ${chalk.bold(name)} created and message sent`
         )
       );
       res.sendStatus(201);
@@ -186,7 +185,7 @@ app.post(MESSAGES_PATH, async (req, res) => {
       await database.collection("messages").insertOne({
         from: user,
         to: message.to,
-        text: message.text,
+        text: stripHtml(message.text),
         type: message.type,
         time: new Date().toLocaleTimeString(),
       });
@@ -230,6 +229,57 @@ app.post(STATUS_PATH, async (req, res) => {
         .updateOne({ name: user }, { $set: { lastStatus: Date.now() } });
       console.log(
         chalk.blue(`${DB_INFO} user ${chalk.bold(user)} status updated`)
+      );
+      res.sendStatus(200);
+    } catch (err) {
+      console.log(chalk.red(`${ERROR} ${err}`));
+      res.status(500).send(err);
+    }
+  } catch (err) {
+    console.log(chalk.red(`${ERROR} ${err}`));
+    res.status(500).send(err);
+  }
+});
+
+app.delete("/messages/:messageId", async (req, res) => {
+  const messageId = req.params.messageId;
+  try {
+    const message = await database
+      .collection("messages")
+      .findOne({ _id: new ObjectID(messageId) });
+    if (!message) {
+      console.log(
+        chalk.red(`${ERROR} Message ${chalk.bold(messageId)} does not exist`)
+      );
+      res.sendStatus(404);
+      return;
+    }
+
+    const user = req.header("user");
+    if (user === undefined) {
+      console.log(chalk.red(`${ERROR} No user header`));
+      res.status(400).send({ error: "No user header" });
+      return;
+    }
+
+    if (message.from !== user && message.to !== user) {
+      console.log(
+        chalk.red(
+          `${ERROR} Message ${chalk.bold(
+            messageId
+          )} does not belong to user ${chalk.bold(user)}`
+        )
+      );
+      res.sendStatus(401);
+      return;
+    }
+
+    try {
+      await database
+        .collection("messages")
+        .deleteOne({ _id: new ObjectID(messageId) });
+      console.log(
+        chalk.blue(`${DB_INFO} message ${chalk.bold(messageId)} deleted`)
       );
       res.sendStatus(200);
     } catch (err) {

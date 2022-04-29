@@ -21,6 +21,7 @@
     "live-server": "^1.2.1",
     "mongodb": "^4.5.0",
     "nodemon": "^2.0.15",
+    "string-strip-html": "^9.1.11",
     "url-exist": "^3.0.0"
   },
   "devDependencies": {
