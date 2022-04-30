@@ -5,8 +5,10 @@
   "type": "module",
   "main": "assets/javascript/script.js",
   "scripts": {
-    "start": "nodemon src/app.js",
-    "dev": "live-server --host=localhost --port=3000 --watch=assets/stylesheet/style.css",
+    "start": "node src/app.js",
+    "server": "nodemon src/app.js",
+    "client": "live-server --host=localhost --port=3000 --watch=assets/javascript/script.js",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

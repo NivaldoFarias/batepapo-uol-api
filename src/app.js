@@ -86,10 +86,7 @@ app.get(MESSAGES_PATH, async (req, res) => {
 });
 
 app.post(PARTICIPANTS_PATH, async (req, res) => {
-  const { name } = req.body;
-  stripHtml(name);
-  name.trim();
-
+  const name = stripHtml(req.body.name).result.trim();
   try {
     const validate = participantSchema.validate(
       { name: name },
@@ -131,7 +128,7 @@ app.post(PARTICIPANTS_PATH, async (req, res) => {
           `${DB_INFO} user ${chalk.bold(name)} created and message sent`
         )
       );
-      res.sendStatus(201);
+      res.status(201).send({ name: name });
     } catch (err) {
       console.log(chalk.red(`${ERROR} ${err}`));
       res.status(500).send(err);
@@ -191,7 +188,7 @@ app.post(MESSAGES_PATH, async (req, res) => {
       await database.collection("messages").insertOne({
         from: user,
         to: message.to,
-        text: stripHtml(message.text),
+        text: stripHtml(message.text).result,
         type: message.type,
         time: new Date().toLocaleTimeString(),
       });
