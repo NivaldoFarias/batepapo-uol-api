@@ -11,7 +11,7 @@
   <p align="center">
     Backend Development Project 
     <br />
-    <a href="https://github.com/NivaldoFarias/batepapo-uol-api-project/tree/main/src/app.js"><strong>Browse JS code»</strong></a>
+    <a href="https://github.com/NivaldoFarias/batepapo-uol-api-project/tree/main/src"><strong>Browse JS code»</strong></a>
 </div>
 
 <!-- ![Banner](https://github.com/NivaldoFarias/projeto10-trackit/blob/main/src/assets/images/trackit-showroom.png) -->
